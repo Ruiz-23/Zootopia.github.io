@@ -101,7 +101,7 @@
 <button id="start-btn" onclick="startGame()">开始任务</button>
 
 <div id="info" style="display:none;">
-    剩余时间: <span id="timer">90</span> 秒
+    剩余时间: <span id="timer">120</span> 秒
 </div>
 
 <audio id="bgm" src="bgm.mp3" loop></audio>
@@ -137,7 +137,7 @@ let cards = [];
 let firstCard = null;
 let secondCard = null;
 let matchedWords = [];
-let timeLeft = 90;
+let timeLeft = 120;
 let timerInterval;
 let isPlaying = false;
 
@@ -173,8 +173,8 @@ function startGame() {
         board.appendChild(div);
     });
 
-    // 考虑到增加了两组词汇，时间依然是100秒，挑战性更强哦！
-    timeLeft = 100;
+    // 考虑到增加了两组词汇，时间依然是120秒，挑战性更强哦！
+    timeLeft = 120;
     document.getElementById('timer').innerText = timeLeft;
     clearInterval(timerInterval);
     timerInterval = setInterval(() => {
