@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>全新挑战：单词消消乐</title>
+<style>
+    body { 
+        font-family: 'Comic Sans MS', 'PingFang SC', sans-serif; 
+        background-color: #e0f7fa; 
+        text-align: center; 
+        color: #333; 
+        margin: 0;
+        padding: 10px; 
+    }
+    h1 { color: #00796b; margin-top: 10px; font-size: 24px; }
+    #info { font-size: 18px; margin-bottom: 10px; font-weight: bold; }
+    #timer { color: #d32f2f; font-size: 24px; }
+    
+    #controls {
+        margin-bottom: 15px;
+        font-size: 14px;
+        font-weight: bold;
+        color: #00796b;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+    }
+    input[type=range] { cursor: pointer; width: 120px; }
+    
+    /* 默认电脑端：4列 */
+    #game-board { 
+        display: grid; 
+        grid-template-columns: repeat(4, 1fr); 
+        gap: 10px; 
+        max-width: 1000px; 
+        margin: 0 auto; 
+        padding-bottom: 30px;
+    }
+    
+    .card { 
+        background-color: #ffffff; 
+        border: 3px solid #00bcd4; 
+        border-radius: 8px; 
+        padding: 10px 5px; 
+        font-size: 15px; 
+        font-weight: bold; 
+        cursor: pointer; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: 60px; 
+        transition: transform 0.2s, opacity 0.3s, background-color 0.3s; 
+        user-select: none; 
+        -webkit-tap-highlight-color: transparent; 
+    }
+    
+    /* 手机端专属优化：屏幕小于600px时，自动变成2列！ */
+    @media (max-width: 600px) {
+        #game-board { 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 8px; 
+        }
+        .card { 
+            font-size: 14px; 
+            min-height: 70px; 
+        }
+    }
+    
+    .card:active { transform: scale(0.95); } 
+    .card.selected { background-color: #ffeb3b; border-color: #fbc02d; transform: scale(1.05); }
+    .card.wrong { background-color: #ffcdd2; border-color: #f44336; }
+    .card.matched { opacity: 0; transform: scale(0); pointer-events: none; visibility: hidden; }
+    
+    #start-btn { 
+        font-size: 18px; 
+        padding: 12px 24px; 
+        background-color: #ff9800; 
+        color: white; 
+        border: none; 
+        border-radius: 8px; 
+        cursor: pointer; 
+        margin-bottom: 20px; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        width: 80%; 
+        max-width: 300px;
+    }
+</style>
+</head>
+<body>
+
+<h1>✨ 单词消消乐：疯狂动物城全新挑战 ✨</h1>
+
+<div id="controls">
+    🎵 音量: 
+    <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.4">
+</div>
+
+<button id="start-btn" onclick="startGame()">开始任务</button>
+
+<div id="info" style="display:none;">
+    剩余时间: <span id="timer">90</span> 秒
+</div>
+
+<audio id="bgm" src="bgm.mp3" loop></audio>
+<audio id="correct-sound" src="correct.mp3"></audio>
+<audio id="wrong-sound" src="wrong.mp3"></audio>
+
+<div id="game-board"></div>
+
+<script>
+// 这里替换成了你的全新词汇表！一共 18 个。
+const vocabulary = [
+    {word: "percent", def: "a part out of 100 / 百分比"},
+    {word: "public face", def: "how you act in front of others / 公众形象"},
+    {word: "credit", def: "praise for doing a good job / 功劳；赞扬"},
+    {word: "tear", def: "a drop of water from your eye / 眼泪"},
+    {word: "opportunity", def: "a good chance to do something / 机会"},
+    {word: "dozen", def: "twelve of something / 一打(十二个)"},
+    {word: "droop", def: "to hang or bend down / 下垂"},
+    {word: "partner", def: "a friend you work or play with / 搭档"},
+    {word: "trier", def: "someone who tries hard / 努力的人"},
+    {word: "self-doubt", def: "thinking you are not good enough / 自我怀疑"},
+    {word: "manifest", def: "to make something real or show it / 显现"},
+    {word: "rage", def: "very strong and big anger / 狂怒"},
+    {word: "produce", def: "to make or create something / 产生；制作"},
+    {word: "on purpose", def: "doing something because you wanted to / 故意地"},
+    {word: "blame", def: "to say someone did something bad / 责怪"},
+    {word: "erase", def: "to rub out or make something go away / 擦除"},
+    {word: "deep breath", def: "pulling a lot of air into your body / 深呼吸"},
+    {word: "steal", def: "to take something that is not yours / 偷窃"}
+];
+
+let cards = [];
+let firstCard = null;
+let secondCard = null;
+let matchedWords = [];
+let timeLeft = 90;
+let timerInterval;
+let isPlaying = false;
+
+const bgm = document.getElementById('bgm');
+const volumeSlider = document.getElementById('volume-slider');
+bgm.volume = volumeSlider.value;
+volumeSlider.addEventListener('input', function() { bgm.volume = this.value; });
+
+function startGame() {
+    if(isPlaying) return;
+    isPlaying = true;
+    document.getElementById('start-btn').style.display = 'none';
+    document.getElementById('info').style.display = 'block';
+    matchedWords = [];
+    
+    bgm.play().catch(e => console.log("手机浏览器限制，需点击后播放"));
+
+    cards = [];
+    vocabulary.forEach(item => {
+        cards.push({ type: 'word', value: item.word, match: item.word });
+        cards.push({ type: 'def', value: item.def, match: item.word });
+    });
+    cards.sort(() => 0.5 - Math.random());
+
+    const board = document.getElementById('game-board');
+    board.innerHTML = '';
+    cards.forEach((card, index) => {
+        let div = document.createElement('div');
+        div.classList.add('card');
+        div.innerText = card.value;
+        div.dataset.index = index;
+        div.onclick = () => flipCard(div, card);
+        board.appendChild(div);
+    });
+
+    // 考虑到增加了两组词汇，时间依然是100秒，挑战性更强哦！
+    timeLeft = 100;
+    document.getElementById('timer').innerText = timeLeft;
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        document.getElementById('timer').innerText = timeLeft;
+        if (timeLeft <= 0) endGame(false);
+    }, 1000);
+}
+
+function flipCard(div, card) {
+    if (firstCard && secondCard) return; 
+    if (div === firstCard?.div) return; 
+    if (div.classList.contains('matched')) return; 
+
+    div.classList.add('selected');
+
+    if (!firstCard) {
+        firstCard = { div, card };
+    } else {
+        secondCard = { div, card };
+        checkMatch();
+    }
+}
+
+function checkMatch() {
+    if (firstCard.card.match === secondCard.card.match) {
+        let correctAudio = document.getElementById('correct-sound');
+        correctAudio.currentTime = 0; 
+        correctAudio.play().catch(e => {});
+
+        firstCard.div.classList.remove('selected');
+        secondCard.div.classList.remove('selected');
+        firstCard.div.classList.add('matched'); 
+        secondCard.div.classList.add('matched');
+        
+        matchedWords.push(firstCard.card.match);
+        firstCard = null;
+        secondCard = null;
+
+        if (matchedWords.length === vocabulary.length) {
+            setTimeout(() => endGame(true), 500);
+        }
+    } else {
+        let wrongAudio = document.getElementById('wrong-sound');
+        wrongAudio.currentTime = 0;
+        wrongAudio.play().catch(e => {});
+
+        firstCard.div.classList.add('wrong');
+        secondCard.div.classList.add('wrong');
+
+        setTimeout(() => {
+            firstCard.div.classList.remove('selected', 'wrong');
+            secondCard.div.classList.remove('selected', 'wrong');
+            firstCard = null;
+            secondCard = null;
+        }, 800); 
+    }
+}
+
+function endGame(isWin) {
+    clearInterval(timerInterval);
+    bgm.pause(); 
+    isPlaying = false;
+    
+    if (isWin) {
+        alert("🎉 恭喜你！你在规定时间内完美完成了新的消消乐任务！");
+    } else {
+        let unmatched = vocabulary.filter(v => !matchedWords.includes(v.word)).map(v => v.word);
+        alert("⏰ 时间到！没有成功消除的单词有：\n" + unmatched.join(", "));
+    }
+    
+    document.getElementById('start-btn').style.display = 'inline-block';
+    document.getElementById('start-btn').innerText = "重新挑战";
+}
+</script>
+</body>
+</html>
